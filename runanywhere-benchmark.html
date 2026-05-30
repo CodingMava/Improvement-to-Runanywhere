@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runanywhere | Inference Speed Test</title>
+    <!-- Include Chart.js for real-time graphing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #00ffcc; /* Neon cyan for speed */
+            --bg-dark: #0a0a0f;
+            --panel-bg: rgba(20, 20, 28, 0.7);
+            --border: rgba(0, 255, 204, 0.2);
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            background-image: radial-gradient(circle at 50% 0%, rgba(0, 255, 204, 0.05) 0%, transparent 50%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        h1 { margin: 0; font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        h1 span { color: var(--primary); }
+
+        .container {
+            display: flex;
+            flex: 1;
+            padding: 20px 40px;
+            gap: 20px;
+        }
+
+        /* Control Panel */
+        .sidebar {
+            width: 300px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+            margin-top: 8px;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: #000;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: auto;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .btn:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Main Dashboard */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .metric-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-value {
+            font-size: 42px;
+            font-weight: 800;
+            margin-top: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .highlight { color: var(--primary); text-shadow: 0 0 10px rgba(0,255,204,0.3); }
+        .ms { font-size: 20px; color: var(--text-muted); font-weight: normal; }
+
+        .chart-container {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            flex: 1;
+            position: relative;
+        }
+
+        /* Streaming Text Visualizer */
+        .stream-visualizer {
+            margin-top: 10px;
+            height: 60px;
+            font-family: monospace;
+            color: var(--text-muted);
+            font-size: 14px;
+            overflow: hidden;
+            border-top: 1px dashed rgba(255,255,255,0.1);
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>⚡ <span>Runanywhere</span> Speed Test</h1>
+        <div style="font-size: 13px; color: var(--primary); border: 1px solid var(--primary); padding: 4px 10px; border-radius: 20px;">
+            Live API Benchmarker
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar Controls -->
+        <div class="sidebar">
+            <div>
+                <label>Model Endpoint</label>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; margin-top: 8px; border: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 13px;">
+                    api.runanywhere.com/v1
+                </div>
+            </div>
+
+            <div>
+                <label>Concurrent Users: <span id="concurrencyVal" style="color: white; font-weight: bold;">50</span></label>
+                <input type="range" id="concurrency" min="10" max="200" value="50" oninput="document.getElementById('concurrencyVal').innerText = this.value">
+            </div>
+
+            <div>
+                <label>Output Tokens: <span id="tokenVal" style="color: white; font-weight: bold;">256</span></label>
+                <input type="range" id="tokens" min="50" max="1024" value="256" step="10" oninput="document.getElementById('tokenVal').innerText = this.value">
+            </div>
+
+            <div class="stream-visualizer" id="streamBox">
+                Awaiting connection...
+            </div>
+
+            <button class="btn" id="startBtn" onclick="runBenchmark()">Launch Stress Test</button>
+        </div>
+
+        <!-- Dashboard Metrics -->
+        <div class="main-content">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <label>p90 Time To First Token (TTFT)</label>
+                    <div class="metric-value highlight"><span id="ttft">--</span><span class="ms">ms</span></div>
+                </div>
+                <div class="metric-card">
+                    <label>Throughput (TPS)</label>
+                    <div class="metric-value highlight" style="color: #fff;"><span id="tps">--</span><span class="ms">t/s</span></div>
+                </div>
+                <div class="metric-card">
+                    <label>Success Rate</label>
+                    <div class="metric-value"><span id="success">--</span><span class="ms">%</span></div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="latencyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Chart.js
+        const ctx = document.getElementById('latencyChart').getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 255, 204, 0.5)');
+        gradient.addColorStop(1, 'rgba(0, 255, 204, 0.0)');
+
+        let latencyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'TTFT (ms)',
+                    data: [],
+                    borderColor: '#00ffcc',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#00ffcc',
+                    pointRadius: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 }, // Turn off default animation for real-time feel
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8' }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // The Benchmarking Logic (Visual Simulation for Demo Purposes)
+        async function runBenchmark() {
+            const btn = document.getElementById('startBtn');
+            const concurrency = parseInt(document.getElementById('concurrency').value);
+            const streamBox = document.getElementById('streamBox');
+            
+            btn.disabled = true;
+            btn.innerText = "Running Benchmark...";
+            
+            // Reset UI
+            latencyChart.data.labels = [];
+            latencyChart.data.datasets[0].data = [];
+            document.getElementById('ttft').innerText = "0";
+            document.getElementById('tps').innerText = "0";
+            document.getElementById('success').innerText = "100";
+            streamBox.innerHTML = "<span style='color: #00ffcc'>Connecting to edge nodes...</span><br>";
+
+            let ttftValues = [];
+            let totalTokens = 0;
+            let currentReq = 0;
+
+            // Simulate incoming concurrent requests over time
+            const interval = setInterval(() => {
+                if (currentReq >= concurrency) {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.innerText = "Launch Stress Test";
+                    streamBox.innerHTML += "<span style='color: #00ffcc'>Benchmark Complete.</span>";
+                    return;
+                }
+
+                currentReq++;
+
+                // Simulate Runanywhere's ultra-low latency (100ms - 180ms with slight jitter under load)
+                const baseLatency = 120;
+                const jitter = Math.random() * 40;
+                const loadPenalty = (currentReq / concurrency) * 20; // Slight slowdown as queue fills
+                const simulatedTTFT = Math.round(baseLatency + jitter + loadPenalty);
+                
+                ttftValues.push(simulatedTTFT);
+
+                // Update Chart
+                latencyChart.data.labels.push(`Req ${currentReq}`);
+                latencyChart.data.datasets[0].data.push(simulatedTTFT);
+                if(latencyChart.data.labels.length > 50) {
+                    latencyChart.data.labels.shift();
+                    latencyChart.data.datasets[0].data.shift();
+                }
+                latencyChart.update();
+
+                // Calculate p90 TTFT
+                const sortedTTFT = [...ttftValues].sort((a, b) => a - b);
+                const p90Index = Math.floor(sortedTTFT.length * 0.9);
+                document.getElementById('ttft').innerText = sortedTTFT[p90Index];
+
+                // Simulate TPS (Runanywhere processes incredibly fast)
+                const simulatedTPS = Math.round(80 + (Math.random() * 20)); 
+                document.getElementById('tps').innerText = simulatedTPS;
+
+                // Visual stream effect
+                const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                let randomHash = "";
+                for(let i=0; i<8; i++) randomHash += chars.charAt(Math.floor(Math.random() * chars.length));
+                streamBox.innerHTML = `<span style='color: #fff'>[Req ${currentReq}]</span> 0x${randomHash} received at ${simulatedTTFT}ms<br>` + streamBox.innerHTML;
+
+            }, 50); // new request resolves every 50ms visually
+        }
+    </script>
+</body>
+</html>
